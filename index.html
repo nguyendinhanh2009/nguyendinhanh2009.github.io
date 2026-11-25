@@ -2,80 +2,213 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Video Dubbing & Inpaint Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AuraDub AI — Video Translation & Inpaint Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0b0f19;
-      --card: #131a2a;
-      --border: #232f48;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
+      --bg-base: #06080f;
+      --bg-card: rgba(15, 21, 36, 0.78);
+      --bg-elevated: rgba(23, 32, 54, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: #6366f1;
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --accent: #06b6d4;
       --success: #10b981;
+      --warning: #f59e0b;
       --danger: #ef4444;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --text-dim: #64748b;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); line-height: 1.5; padding: 16px; }
-    .container { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-    header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-    header h1 { font-size: 1.25rem; font-weight: 700; color: #fff; }
-    .badge { font-size: 0.78rem; padding: 4px 10px; border-radius: 999px; background: #1e293b; color: var(--muted); border: 1px solid var(--border); }
-    .badge.online { background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.4); }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-    .card-title { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .col { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 0.82rem; color: var(--muted); }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image:
+        radial-gradient(circle at 15% 0%, rgba(99, 102, 241, 0.16), transparent 42%),
+        radial-gradient(circle at 85% 10%, rgba(6, 182, 212, 0.12), transparent 38%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 16px 14px 48px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Header */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 2px 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: grid;
+      place-items: center;
+      box-shadow: 0 6px 18px var(--primary-glow);
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-text p {
+      font-size: 0.74rem;
+      color: var(--text-sub);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+
+    .status-pill .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+
+    .status-pill.online {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .status-pill.online .dot {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.18);
+      color: #818cf8;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+    }
+
+    /* Inputs & Buttons */
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 480px) {
+      .input-group { flex-direction: column; }
+    }
+
+    .input-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
     input[type="text"], select {
-      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-      background: #0f1523; color: var(--text); font-size: 0.9rem; outline: none;
+      width: 100%;
+      background: rgba(9, 13, 24, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      padding: 11px 14px;
+      outline: none;
+      transition: 0.2s;
     }
-    input[type="text"]:focus, select:focus { border-color: var(--primary); }
-    button {
-      padding: 10px 16px; border-radius: 10px; border: none; font-size: 0.9rem; font-weight: 600;
-      cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
     }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover { background: #1e293b; }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
 
-    .upload-box {
-      border: 2px dashed var(--border); border-radius: 12px; padding: 24px 16px; text-align: center;
-      cursor: pointer; transition: 0.2s; background: #0f1523;
-    }
-    .upload-box:hover { border-color: var(--primary); }
-    .upload-box p { font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+    .btn-paste {
+      position: absolute;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      font-size: 0.75
 
-    .video-stage { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; display: none; }
-    .video-stage video { width: 100%; display: block; max-height: 440px; }
-    .video-stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
-
-    .toggle-list { display: flex; flex-direction: column; gap: 10px; }
-    .toggle-item {
-      display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
-      background: #0f1523; border: 1px solid var(--border); border-radius: 10px;
-    }
-    .toggle-item span { font-size: 0.88rem; }
-    .toggle-item small { display: block; font-size: 0.76rem; color: var(--muted); }
-    input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
-
-    .progress-wrap { display: none; flex-direction: column; gap: 8px; }
-    .progress-bar { width: 100%; height: 10px; background: #0f1523; border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
-    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.3s; }
-    .status-text { font-size: 0.84rem; color: var(--muted); display: flex; justify-content: space-between; }
-
-    .result-box { display: none; flex-direction: column; gap: 12px; }
-    .transcript-box {
-      max-height: 200px; overflow-y: auto; background: #0f1523; border: 1px solid var(--border);
-      border-radius: 10px; padding: 10px; font-size: 0.84rem; display: flex; flex-direction: column; gap: 8px;
-    }
-    .seg-item { padding-bottom: 6px; border-bottom: 1px solid #1e293b; }
-    .seg-time { color: var(--primary); font-size: 0.76rem; font-weight: 600; }
   </style>
 </head>
 <body>
