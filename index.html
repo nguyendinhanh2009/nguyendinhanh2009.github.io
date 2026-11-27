@@ -306,7 +306,7 @@
         <div id="loggedInArea" style="display:none; flex-direction:column; gap:10px;">
           <div class="acc-status-bar">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-family:monospace; font-size:0.95rem; letter-spacing:1px; color:#f8fafc;">*****...</span>
+              <span id="loggedInEmail" style="font-size:0.84rem; font-weight:600; color:#f8fafc; word-break:break-all;"></span>
               <span id="accountRoleBadge" class="role-tag role-member"><strong>Thành Viên</strong></span>
             </div>
             <button type="button" class="btn-danger" style="padding:5px 10px; font-size:0.76rem; border-radius:999px;" onclick="handleLogout()">Đăng xuất</button>
@@ -604,7 +604,7 @@
       container.innerHTML = list.map((m, idx) => `
         <div class="member-item">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span style="font-family:monospace; color:#f8fafc;">*****...</span>
+            <span style="font-size:0.82rem; color:#f8fafc; word-break:break-all;">${escapeHtml(m.email)}</span>
             <span class="role-tag role-member" style="font-size:0.7rem; padding:2px 7px;"><strong>Thành Viên</strong></span>
           </div>
           <button type="button" class="btn-danger" style="padding:4px 9px; font-size:0.74rem; border-radius:999px;" onclick="deleteMemberAccount(${idx})">Xóa</button>
@@ -630,6 +630,7 @@
       } else {
         loginForm.style.display = "none";
         loggedInArea.style.display = "flex";
+        document.getElementById("loggedInEmail").textContent = session.email;
         lockedBox.style.display = "none";
         unlockedBox.style.display = "flex";
 
