@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Dubbing & Inpaint Studio</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #131a2a;
+      --border: #232f48;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-hover: #059669;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); line-height: 1.5; padding: 16px; }
+    .container { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+    /* Thông báo nổi khi hoàn thành video */
+    .toast-banner {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-140%);
+      width: min(440px, 92vw); background: linear-gradient(135deg, #064e3b, #0f172a);
+      border: 1px solid #10b981; border-radius: 14px; padding: 12px 14px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); z-index: 1200;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .toast-banner.show { transform: translateX(-50%) translateY(0); }
+    .toast-text strong { display: block; font-size: 0.88rem; color: #34d399; }
+    .toast-text span { font-size: 0.78rem; color: #e2e8f0; }
+
+    /* Header & Nút 3 gạch */
+    header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    header h1 { font-size: 1.15rem; font-weight: 700; color: #fff; }
+    .menu-btn {
+      background: #1e293b; border: 1px solid var(--border); color: #fff;
+      padding: 8px 12px; border-radius: 10px; font-size: 1.05rem; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; position: relative;
+    }
+    .menu-btn:hover { background: #283548; }
+    .menu-badge {
+      background: var(--primary); color: #fff; font-size: 0.72rem; font-weight: 700;
+      padding: 1px 7px; border-radius: 999px;
+    }
+    .menu-badge.running { background: var(--warning); color: #0b0f19; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+    .badge {
+      font-size: 0.76rem; padding: 5px 11px; border-radius: 999px; background: #1e293b;
+      color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: pointer;
+    }
+    .badge.online { background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: rgba(16, 185, 129, 0.4); }
+
+    /* Drawer 3 gạch (Lịch sử + Cài đặt Token & Tài khoản) */
+    .drawer-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.68); z-index: 998;
+      display: none; backdrop-filter: blur(2px);
+    }
+    .drawer-backdrop.open { display: block; }
+    .history-drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; width: min(400px, 90vw);
+      background: #0f1523; border-right: 1px solid var(--border); z-index: 999;
+      transform: translateX(-100%); transition: transform 0.25s ease;
+      display: flex; flex-direction: column;
+    }
+    .history-drawer.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 16px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .drawer-header h2 { font-size: 1rem; font-weight: 700; }
+    .drawer-main-tabs {
+      display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #131a2a;
+    }
+    .main-tab-btn {
+      flex: 1; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 0.84rem; font-weight: 700; cursor: pointer;
+    }
+    .main-tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .drawer-sub-tabs {
+      display: flex; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--border); background: #0d1320;
+    }
+    .tab-btn {
+      flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    }
+    .tab-btn.active { background: #1e293b; color: #fff; border-color: #3b82f6; }
+
+    .drawer-body {
+      flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .drawer-footer {
+      padding: 12px 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px;
+    }
+
+    /* Các khối bên trong Cài đặt */
+    .settings-box {
+      background: #131a2a; border: 1px solid var(--border); border-radius: 12px; padding: 13px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .settings-box h3 { font-size: 0.9rem; color: #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .acc-status-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      background: #0b0f19; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    }
+    .role-tag {
+      font-size: 0.78rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.3px;
+    }
+    .role-admin { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45); }
+    .role-member { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45); }
+
+    .member-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 8px 10px; background: #0f1523; border: 1px solid #1e293b; border-radius: 8px; font-size: 0.82rem;
+    }
+    .locked-notice {
+      background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.45);
+      color: #fbbf24; padding: 12px; border-radius: 10px; font-size: 0.82rem; text-align: center;
+    }
+
+    /* Lịch sử cards */
+    .hist-card {
+      background: #131a2a; border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .hist-card.active-job { border-color: var(--primary); }
+    .hist-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .hist-name { font-size: 0.86rem; font-weight: 600; color: #f8fafc; word-break: break-word; }
+    .hist-meta { font-size: 0.74rem; color: var(--muted); }
+    .hist-status {
+      font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    }
+    .st-processing { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
+    .st-completed { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+    .st-error { background: rgba(239, 68, 68, 0.18); color: #f87171; }
+    .hist-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .hist-actions button { padding: 6px 12px; font-size: 0.78rem; border-radius: 999px; flex: 1; }
+
+    /* Cards chính */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .card-title { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 0.82rem; color: var(--muted); }
+    input[type="text"], input[type="password"], select {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: #0f1523; color: var(--text); font-size: 0.88rem; outline: none;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--primary); }
+    button, .btn-link {
+      padding: 10px 16px; border-radius: 10px; border: none; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: var(--success-hover); }
+    .btn-success:disabled { opacity: 0.6; cursor: wait; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #1e293b; }
+    .btn-active { background: rgba(59, 130, 246, 0.2); border: 1px solid var(--primary); color: #60a5fa; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    /* 3 nút tải bo tròn dạng viên thuốc */
+    .action-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .btn-pill {
+      flex: 1 1 150px; border-radius: 9999px !important; padding: 12px 20px;
+      font-size: 0.88rem; font-weight: 600; text-align: center; white-space: nowrap;
+    }
+
+    .upload-box {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 24px 16px; text-align: center;
+      cursor: pointer; transition: 0.2s; background: #0f1523;
+    }
+    .upload-box:hover { border-color: var(--primary); }
+    .upload-box p { font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+
+    .video-stage { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; display: none; }
+    .video-stage video { width: 100%; display: block; max-height: 440px; }
+    .video-stage canvas {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; cursor: crosshair;
+    }
+
+    .toggle-list { display: flex; flex-direction: column; gap: 10px; }
+    .toggle-item {
+      display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
+      background: #0f1523; border: 1px solid var(--border); border-radius: 10px; gap: 12px;
+    }
+    .toggle-item span { font-size: 0.88rem; }
+    .toggle-item small { display: block; font-size: 0.76rem; color: var(--muted); }
+    input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+
+    .mini-bar { width: 100%; height: 6px; background: #0f1523; border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+    .mini-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.3s; }
+
+    /* PHẦN 4: VÒNG TRÒN TIẾN ĐỘ & KHUNG HOÀN THÀNH RIÊNG */
+    .section4-card { display: none; flex-direction: column; gap: 16px; }
+
+    /* Vòng tròn tiến độ */
+    .circular-progress-box {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px 16px; background: radial-gradient(circle at center, #17233b 0%, #0f1523 100%);
+      border: 1px solid #263552; border-radius: 16px; text-align: center; gap: 12px;
+    }
+    .ring-wrap { position: relative; width: 148px; height: 148px; display: flex; align-items: center; justify-content: center; }
+    .ring-wrap svg { transform: rotate(-90deg); width: 148px; height: 148px; }
+    .ring-bg { fill: none; stroke: #1e293b; stroke-width: 11; }
+    .ring-fg {
+      fill: none; stroke: url(#ringGrad); stroke-width: 11; stroke-linecap: round;
+      stroke-dasharray: 389.56; stroke-dashoffset: 389.56;
+      transition: stroke-dashoffset 0.45s ease;
+    }
+    .ring-center {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .ring-pct { font-size: 1.7rem; font-weight: 800; color: #fff; line-height: 1.1; }
+    .ring-sub { font-size: 0.7rem; color: #60a5fa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .ring-filename { font-size: 0.9rem; font-weight: 600; color: #f8fafc; max-width: 90%; word-break: break-word; }
+    .ring-status-msg { font-size: 0.84rem; color: #94a3b8; }
+
+    /* Khung hoàn thành video riêng (đẹp, nổi bật) */
+    .completed-showcase {
+      display: none; flex-direction: column; gap: 14px;
+      background: linear-gradient(165deg, rgba(16, 185, 129, 0.12) 0%, #0f1626 42%, #111827 100%);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      border-radius: 16px; padding: 16px;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.08);
+    }
+    .done-header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+      padding-bottom: 10px; border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .done-pill {
+      background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45);
+      font-size: 0.76rem; font-weight: 700; padding: 4px 12px; border-radius: 999px;
+    }
+    .done-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .done-video-frame {
+      border-radius: 12px; overflow: hidden; background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    .done-video-frame video { width: 100%; display: block; max-height: 460px; }
+
+    .transcript-box {
+      max-height: 240px; overflow-y: auto; background: rgba(11, 15, 25, 0.85); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px; font-size: 0.84rem; display: flex; flex-direction: column; gap: 8px;
+    }
+    .seg-item { padding-bottom: 6px; border-bottom: 1px solid #1e293b; }
+    .seg-time { color: var(--primary); font-size: 0.76rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <!-- Thông báo nổi khi hoàn thành video -->
+  <div class="toast-banner" id="toastBanner">
+    <div class="toast-text">
+      <strong>🎉 Video đã xử lý hoàn tất!</strong>
+      <span id="toastDesc">Sẵn sàng xem và lưu vào thư viện.</span>
+    </div>
+    <button type="button" class="btn-success" style="padding: 6px 12px; border-radius: 999px; font-size: 0.78rem;" onclick="hideToast()">Đóng</button>
+  </div>
+
+  <!-- Menu 3 gạch trượt ngang (Lịch sử + Cài đặt Token & Tài khoản) -->
+  <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+  <aside class="history-drawer" id="historyDrawer">
+    <div class="drawer-header">
+      <h2>Bảng điều khiển</h2>
+      <button class="btn-outline" style="padding: 5px 10px; font-size: 0.82rem;" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <!-- 2 Tab chính trong menu 3 gạch -->
+    <div class="drawer-main-tabs">
+      <button class="main-tab-btn active" id="mainTabHistory" onclick="switchDrawerSection('history')">Lịch sử Video</button>
+      <button class="main-tab-btn" id="mainTabSettings" onclick="switchDrawerSection('settings')">⚙ Cài đặt</button>
+    </div>
+
+    <!-- PHẦN A: LỊCH SỬ VIDEO -->
+    <div id="sectionHistory" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+      <div class="drawer-sub-tabs">
+        <button class="tab-btn active" id="tabAll" onclick="setHistoryFilter('all')">Tất cả</button>
+        <button class="tab-btn" id="tabRunning" onclick="setHistoryFilter('processing')">Đang chạy</button>
+        <button class="tab-btn" id="tabDone" onclick="setHistoryFilter('completed')">Đã xong</button>
+      </div>
+      <div class="drawer-body" id="historyList"></div>
+      <div class="drawer-footer">
+        <button class="btn-outline" style="flex:1; font-size:0.8rem; padding:8px;" onclick="syncJobsFromServer(true)">Đồng bộ Colab</button>
+        <button class="btn-danger" style="font-size:0.8rem; padding:8px 12px;" onclick="clearCompletedHistory()">Xóa mục xong</button>
+      </div>
+    </div>
+
+    <!-- PHẦN B: CÀI ĐẶT (TÀI KHOẢN + TOKEN GOOGLE COLAB) -->
+    <div id="sectionSettings" class="drawer-body" style="display:none;">
+      <!-- 1. Tài khoản mở khóa -->
+      <div class="settings-box">
+        <h3>1. Tài khoản truy cập</h3>
+
+        <!-- Form đăng nhập khi chưa đăng nhập -->
+        <div id="loginFormArea" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="col">
+            <label>Tài khoản (Email)</label>
+            <input type="text" id="loginUser" placeholder="Nhập tài khoản..." autocomplete="username" />
+          </div>
+          <div class="col">
+            <label>Mật khẩu</label>
+            <input type="password" id="loginPass" placeholder="Nhập mật khẩu..." autocomplete="current-password" />
+          </div>
+          <button type="button" class="btn-primary" style="border-radius:999px; margin-top:2px;" onclick="handleLogin()">Đăng nhập mở khóa</button>
+        </div>
+
+        <!-- Thông tin sau khi đã đăng nhập (ẩn thành *****... + ADMIN / Thành Viên in đậm) -->
+        <div id="loggedInArea" style="display:none; flex-direction:column; gap:10px;">
+          <div class="acc-status-bar">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-family:monospace; font-size:0.95rem; letter-spacing:1px; color:#f8fafc;">*****...</span>
+              <span id="accountRoleBadge" class="role-tag role-member"><strong>Thành Viên</strong></span>
+            </div>
+            <button type="button" class="btn-danger" style="padding:5px 10px; font-size:0.76rem; border-radius:999px;" onclick="handleLogout()">Đăng xuất</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Nhập / Dán / Xóa Token Google Colab -->
+      <div class="settings-box">
+        <h3>2. Token / Link Google Colab</h3>
+
+        <div id="tokenLockedBox" class="locked-notice">
+          🔒 Vui lòng đăng nhập tài khoản ở mục trên để mở khóa nhập Token Google Colab.
+        </div>
+
+        <div id="tokenUnlockedBox" style="display:none; flex-direction:column; gap:10px;">
+          <div class="col">
+            <label>Token / Link kết nối Colab hiện tại</label>
+            <input type="text" id="apiUrl" placeholder="https://xxxx.trycloudflare.com" oninput="saveTokenDirect(this.value)" onpaste="handleDirectPaste(event)" />
+          </div>
+          <div class="row">
+            <button type="button" class="btn-primary" style="flex:1; border-radius:999px; padding:9px 12px; font-size:0.82rem;" onclick="pasteAndOverwriteToken()">📋 Dán Token</button>
+            <button type="button" class="btn-danger" style="flex:1; border-radius:999px; padding:9px 12px; font-size:0.82rem;" onclick="deleteToken()">🗑 Xóa Token</button>
+          </div>
+          <button type="button" class="btn-outline" style="border-radius:999px; padding:8px; font-size:0.82rem;" onclick="checkServer(true)">Kiểm tra kết nối máy chủ</button>
+        </div>
+      </div>
+
+      <!-- 3. Quản lý tài khoản thành viên (Chỉ hiện khi đăng nhập ADMIN) -->
+      <div class="settings-box" id="adminPanelBox" style="display:none; border-color: rgba(239, 68, 68, 0.4);">
+        <h3>3. Quản lý tài khoản <span class="role-tag role-admin"><strong>ADMIN</strong></span></h3>
+        <div class="col">
+          <label>Thêm tài khoản mới</label>
+          <input type="text" id="newMemberUser" placeholder="Nhập email / tên tài khoản..." />
+        </div>
+        <div class="col">
+          <label>Mật khẩu tài khoản mới</label>
+          <input type="password" id="newMemberPass" placeholder="Nhập mật khẩu..." />
+        </div>
+        <button type="button" class="btn-success" style="border-radius:999px; padding:9px; font-size:0.82rem;" onclick="addMemberAccount()">+ Thêm tài khoản Thành Viên</button>
+
+        <div style="border-top:1px solid var(--border); padding-top:8px; display:flex; flex-direction:column; gap:6px;">
+          <label>Danh sách tài khoản đã cấp quyền:</label>
+          <div id="memberListContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="container">
+    <header>
+      <div class="header-left">
+        <button type="button" class="menu-btn" onclick="openDrawer('history')" title="Lịch sử & Cài đặt">
+          ☰ <span id="menuBadge" class="menu-badge">0</span>
+        </button>
+        <h1>AI Video Dubbing</h1>
+      </div>
+      <span id="serverBadge" class="badge" onclick="openDrawer('settings')" title="Bấm để mở Cài đặt Token">Chưa kết nối Colab</span>
+    </header>
+
+    <!-- 1. Chọn video gốc -->
+    <div class="card">
+      <div class="card-title">
+        <span>1. Chọn video gốc</span>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-outline" id="btnToggleDraw" style="display:none; padding: 4px 10px; font-size: 0.78rem;" onclick="toggleDrawMode()">Khoanh logo: Tắt</button>
+          <button class="btn-danger" id="btnClearBoxes" style="display:none; padding: 4px 10px; font-size: 0.78rem;" onclick="clearBoxes()">Xóa vùng chọn</button>
+        </div>
+      </div>
+      <div class="upload-box" id="dropZone" onclick="document.getElementById('videoInput').click()">
+        <strong>Bấm để chọn video từ thiết bị</strong>
+        <p id="fileName">Hỗ trợ MP4, MOV, MKV (Tự động chạy ngầm sau khi tải lên)</p>
+        <input type="file" id="videoInput" accept="video/*" hidden onchange="handleFileSelect(event)" />
+      </div>
+
+      <div class="video-stage" id="videoStage">
+        <video id="previewVideo" controls playsinline></video>
+        <canvas id="overlayCanvas"></canvas>
+      </div>
+      <small id="drawHint" style="display:none; color: var(--muted); font-size: 0.78rem;">
+        Mẹo: Bấm nút <strong>Khoanh logo</strong> ở trên để bật chế độ vẽ ô vuông che logo cần xóa (tắt đi để bấm xem video bình thường).
+      </small>
+    </div>
+
+    <!-- 2. Cấu hình dịch thuật & tính năng -->
+    <div class="card">
+      <div class="card-title">2. Ngôn ngữ & Tính năng AI</div>
+      <div class="row">
+        <div class="col">
+          <label>Ngôn ngữ gốc trong video</label>
+          <select id="srcLang">
+            <option value="auto">Tự động nhận diện (Auto)</option>
+            <option value="zh">Tiếng Trung (Chinese)</option>
+            <option value="en">Tiếng Anh (English)</option>
+            <option value="ja">Tiếng Nhật (Japanese)</option>
+            <option value="ko">Tiếng Hàn (Korean)</option>
+            <option value="vi">Tiếng Việt (Vietnamese)</option>
+            <option value="th">Tiếng Thái (Thai)</option>
+            <option value="ru">Tiếng Nga (Russian)</option>
+            <option value="fr">Tiếng Pháp (French)</option>
+            <option value="es">Tiếng Tây Ban Nha (Spanish)</option>
+          </select>
+        </div>
+        <div class="col">
+          <label>Dịch & Lồng tiếng sang</label>
+          <select id="tgtLang">
+            <option value="vi">Tiếng Việt (Vietnamese)</option>
+            <option value="en">Tiếng Anh (English)</option>
+            <option value="zh-cn">Tiếng Trung (Chinese)</option>
+            <option value="ja">Tiếng Nhật (Japanese)</option>
+            <option value="ko">Tiếng Hàn (Korean)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toggle-list">
+        <div class="toggle-item">
+          <div>
+            <span>Lồng tiếng giữ chất giọng gốc của nhân vật</span>
+            <small>AI tách giọng từng nhân vật và nhân bản màu giọng gốc sang ngôn ngữ đích, giữ nhạc nền</small>
+          </div>
+          <input type="checkbox" id="optDubbing" checked />
+        </div>
+        <div class="toggle-item">
+          <div>
+            <span>AI quét & xóa chữ gốc trên màn hình</span>
+            <small>Tự động nhận diện chữ gốc (OCR) + xóa vùng logo đã khoanh bằng AI LaMa</small>
+          </div>
+          <input type="checkbox" id="optEraseText" checked />
+        </div>
+        <div class="toggle-item">
+          <div>
+            <span>Gắn cứng phụ đề mới vào video</span>
+            <small>Hiển thị phụ đề ngôn ngữ đích bên dưới khung hình + xuất file .SRT</small>
+          </div>
+          <input type="checkbox" id="optBurnSub" checked />
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btnStart" style="border-radius: 9999px; padding: 13px;" onclick="startProcessing()">Bắt đầu xử lý video</button>
+    </div>
+
+    <!-- PHẦN 4: VÒNG TRÒN TIẾN ĐỘ & KHU VỰC HOÀN THÀNH VIDEO RIÊNG -->
+    <div class="card section4-card" id="section4Card">
+      <div class="card-title">
+        <span>4. Tiến trình & Thành phẩm</span>
+        <span id="sec4Badge" class="badge">Đang xử lý</span>
+      </div>
+
+      <!-- 4A. Thanh tiến độ vòng tròn nằm trong Phần 4 -->
+      <div class="circular-progress-box" id="circularProgressBox">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 148 148">
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#3b82f6" />
+                <stop offset="100%" stop-color="#10b981" />
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="74" cy="74" r="62"></circle>
+            <circle class="ring-fg" id="ringFg" cx="74" cy="74" r="62"></circle>
+          </svg>
+          <div class="ring-center">
+            <span class="ring-pct" id="ringPct">0%</span>
+            <span class="ring-sub">Đang chạy</span>
+          </div>
+        </div>
+        <div class="ring-filename" id="ringFileName">Đang chuẩn bị...</div>
+        <div class="ring-status-msg" id="ringStatusMsg">Đang tải video lên máy chủ...</div>
+      </div>
+
+      <!-- 4B. Phần hoàn thành video riêng biệt (đẹp) -->
+      <div class="completed-showcase" id="completedShowcase">
+        <div class="done-header">
+          <div class="done-title" id="resultTitle">Video thành phẩm</div>
+          <span class="done-pill">✓ Hoàn thành</span>
+        </div>
+
+        <div class="done-video-frame">
+          <video id="resultVideo" controls playsinline preload="metadata"></video>
+        </div>
+
+        <div class="action-pills">
+          <button type="button" id="saveLibraryBtn" class="btn-success btn-pill" onclick="saveToLibrary()">📲 Lưu vào Thư viện</button>
+          <a id="downloadVideoBtn" class="btn-link btn-primary btn-pill" download="video_da_dich.mp4">⬇ Tải Video (.MP4)</a>
+          <a id="downloadSrtBtn" class="btn-link btn-outline btn-pill" download="phu_de.srt">📄 Tải Phụ Đề (.SRT)</a>
+        </div>
+
+        <div class="transcript-box" id="transcriptBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const HISTORY_KEY = "ai_dub_job_history_v1";
+    const AUTH_SESSION_KEY = "ai_dub_auth_session_v1";
+    const MEMBERS_KEY = "ai_dub_member_accounts_v1";
+    const TOKEN_KEY = "colab_api_url";
+
+    const ADMIN_EMAIL = "nguyendinhanh2k9@gmail.com";
+    const ADMIN_PASS = "haikokochin";
+    const RING_CIRCUMFERENCE = 2 * Math.PI * 62; // ~389.56
+
+    let selectedFile = null;
+    let logoBoxes = [];
+    let isDrawing = false;
+    let drawMode = false;
+    let startX = 0, startY = 0;
+    let cachedVideoBlob = null;
+    let cachedFileName = "video_da_dich.mp4";
+    let jobHistory = [];
+    let focusedJobId = null;
+    let historyFilter = "all";
+    let backgroundPoller = null;
+    let wakeLockSentinel = null;
+    let silentAudioCtx = null;
+    let toastTimer = null;
+
+    // --- Hệ thống Tài khoản (Admin & Thành Viên) ---
+    function getMemberAccounts() {
+      try {
+        const raw = localStorage.getItem(MEMBERS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveMemberAccounts(list) {
+      localStorage.setItem(MEMBERS_KEY, JSON.stringify(list));
+      renderMemberList();
+    }
+
+    function getCurrentSession() {
+      try {
+        const raw = localStorage.getItem(AUTH_SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function handleLogin() {
+      const user = document.getElementById("loginUser").value.trim().toLowerCase();
+      const pass = document.getElementById("loginPass").value;
+      if (!user || !pass) return alert("Vui lòng nhập đầy đủ tài khoản và mật khẩu.");
+
+      if (user === ADMIN_EMAIL && pass === ADMIN_PASS) {
+        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({ email: user, role: "admin" }));
+        document.getElementById("loginPass").value = "";
+        updateAuthUI();
+        return;
+      }
+
+      const members = getMemberAccounts();
+      const found = members.find(m => m.email.toLowerCase() === user && m.password === pass);
+      if (found) {
+        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({ email: found.email, role: "member" }));
+        document.getElementById("loginPass").value = "";
+        updateAuthUI();
+        return;
+      }
+
+      alert("Sai tài khoản hoặc mật khẩu!");
+    }
+
+    function handleLogout() {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      updateAuthUI();
+    }
+
+    function addMemberAccount() {
+      const session = getCurrentSession();
+      if (!session || session.role !== "admin") return;
+
+      const email = document.getElementById("newMemberUser").value.trim().toLowerCase();
+      const password = document.getElementById("newMemberPass").value.trim();
+      if (!email || !password) return alert("Hãy nhập tài khoản và mật khẩu cho thành viên mới.");
+      if (email === ADMIN_EMAIL) return alert("Tài khoản này trùng với tài khoản Admin.");
+
+      const list = getMemberAccounts();
+      if (list.some(m => m.email.toLowerCase() === email)) {
+        return alert("Tài khoản này đã tồn tại!");
+      }
+      list.push({ email, password });
+      saveMemberAccounts(list);
+      document.getElementById("newMemberUser").value = "";
+      document.getElementById("newMemberPass").value = "";
+    }
+
+    function deleteMemberAccount(idx) {
+      const session = getCurrentSession();
+      if (!session || session.role !== "admin") return;
+      const list = getMemberAccounts();
+      list.splice(idx, 1);
+      saveMemberAccounts(list);
+    }
+
+    function renderMemberList() {
+      const container = document.getElementById("memberListContainer");
+      const list = getMemberAccounts();
+      if (list.length === 0) {
+        container.innerHTML = `<div style="font-size:0.78rem; color:var(--muted);">Chưa có tài khoản thành viên nào.</div>`;
+        return;
+      }
+      container.innerHTML = list.map((m, idx) => `
+        <div class="member-item">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-family:monospace; color:#f8fafc;">*****...</span>
+            <span class="role-tag role-member" style="font-size:0.7rem; padding:2px 7px;"><strong>Thành Viên</strong></span>
+          </div>
+          <button type="button" class="btn-danger" style="padding:4px 9px; font-size:0.74rem; border-radius:999px;" onclick="deleteMemberAccount(${idx})">Xóa</button>
+        </div>
+      `).join("");
+    }
+
+    function updateAuthUI() {
+      const session = getCurrentSession();
+      const loginForm = document.getElementById("loginFormArea");
+      const loggedInArea = document.getElementById("loggedInArea");
+      const roleBadge = document.getElementById("accountRoleBadge");
+      const lockedBox = document.getElementById("tokenLockedBox");
+      const unlockedBox = document.getElementById("tokenUnlockedBox");
+      const adminPanel = document.getElementById("adminPanelBox");
+
+      if (!session) {
+        loginForm.style.display = "flex";
+        loggedInArea.style.display = "none";
+        lockedBox.style.display = "block";
+        unlockedBox.style.display = "none";
+        adminPanel.style.display = "none";
+      } else {
+        loginForm.style.display = "none";
+        loggedInArea.style.display = "flex";
+        lockedBox.style.display = "none";
+        unlockedBox.style.display = "flex";
+
+        if (session.role === "admin") {
+          roleBadge.className = "role-tag role-admin";
+          roleBadge.innerHTML = "<strong>ADMIN</strong>";
+          adminPanel.style.display = "flex";
+          renderMemberList();
+        } else {
+          roleBadge.className = "role-tag role-member";
+          roleBadge.innerHTML = "<strong>Thành Viên</strong>";
+          adminPanel.style.display = "none";
+        }
+      }
+    }
+
+    // --- Quản lý Token Google Colab (Dán đè token cũ & Xóa token) ---
+    function getBaseUrl() {
+      const saved = localStorage.getItem(TOKEN_KEY) || "";
+      return saved.trim().replace(/\/+$/, "");
+    }
+
+    function saveTokenDirect(val) {
+      const clean = val.trim().replace(/\/+$/, "");
+      if (clean) {
+        localStorage.setItem(TOKEN_KEY, clean);
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+    }
+
+    function handleDirectPaste(e) {
+      // Xóa sạch token cũ và đè token mới lên ngay khi người dùng dán trực tiếp vào ô
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData).getData("text").trim();
+      const input = document.getElementById("apiUrl");
+      input.value = "";
+      input.value = pasted;
+      saveTokenDirect(pasted);
+      if (pasted) checkServer(false);
+    }
+
+    async function pasteAndOverwriteToken() {
+      const input = document.getElementById("apiUrl");
+      // Xóa token cũ trước
+      input.value = "";
+      localStorage.removeItem(TOKEN_KEY);
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const clipText = (await navigator.clipboard.readText()).trim();
+          if (clipText) {
+            input.value = clipText;
+            saveTokenDirect(clipText);
+            await checkServer(true);
+            return;
+          }
+        }
+      } catch (err) {}
+
+      // Fallback trên iOS Safari nếu cần chạm dán thủ công: ô đã được xóa trắng sẵn
+      input.focus();
+      alert("Đã xóa token cũ! Hãy chạm vào ô trống phía trên và chọn 'Dán' để đè token mới.");
+    }
+
+    function deleteToken() {
+      const input = document.getElementById("apiUrl");
+      input.value = "";
+      localStorage.removeItem(TOKEN_KEY);
+      const badge = document.getElementById("serverBadge");
+      badge.textContent = "Chưa kết nối Colab";
+      badge.className = "badge";
+    }
+
+    // --- Thông báo hoàn thành (Âm thanh + Banner nổi + Thông báo trình duyệt) ---
+    function requestNotifyPermission() {
+      try {
+        if ("Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    function playCompletionChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        [523.25, 659.25, 783.99].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+          gain.gain.setValueAtTime(0.08, now + idx * 0.11);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.11 + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.11);
+          osc.stop(now + idx * 0.11 + 0.36);
+        });
+      } catch (e) {}
+    }
+
+    function triggerCompletionNotification(fileName) {
+      playCompletionChime();
+      const banner = document.getElementById("toastBanner");
+      document.getElementById("toastDesc").textContent = `${fileName} đã dịch & lồng tiếng xong!`;
+      banner.classList.add("show");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 7000);
+
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("🎉 Video đã dịch hoàn tất!", {
+            body: `${fileName} đã sẵn sàng xem và lưu vào thư viện.`
+          });
+        }
+      } catch (e) {}
+    }
+
+    function hideToast() {
+      document.getElementById("toastBanner").classList.remove("show");
+    }
+
+    // --- Giữ trình duyệt hoạt động ngầm ---
+    async function enableBackgroundKeepAlive() {
+      try {
+        if ("wakeLock" in navigator && !wakeLockSentinel) {
+          wakeLockSentinel = await navigator.wakeLock.request("screen");
+        }
+      } catch (e) {}
+      try {
+        if (!silentAudioCtx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            silentAudioCtx = new AudioCtx();
+            const osc = silentAudioCtx.createOscillator();
+            const gain = silentAudioCtx.createGain();
+            gain.gain.value = 0.0001;
+            osc.connect(gain);
+            gain.connect(silentAudioCtx.destination);
+            osc.start();
+          }
+        }
+        if (silentAudioCtx && silentAudioCtx.state === "suspended") {
+          await silentAudioCtx.resume();
+        }
+      } catch (e) {}
+    }
+
+    function disableBackgroundKeepAliveIfIdle() {
+      const hasActive = jobHistory.some(j => j.status === "processing" || j.status === "uploading");
+      if (!hasActive) {
+        if (wakeLockSentinel) {
+          wakeLockSentinel.release().catch(() => {});
+          wakeLockSentinel = null;
+        }
+        if (silentAudioCtx) {
+          silentAudioCtx.close().catch(() => {});
+          silentAudioCtx = null;
+        }
+      }
+    }
+
+    // --- Điều khiển Menu 3 gạch ---
+    function openDrawer(section = "history") {
+      document.getElementById("historyDrawer").classList.add("open");
+      document.getElementById("drawerBackdrop").classList.add("open");
+      switchDrawerSection(section);
+      renderHistoryDrawer();
+    }
+
+    function closeDrawer() {
+      document.getElementById("historyDrawer").classList.remove("open");
+      document.getElementById("drawerBackdrop").classList.remove("open");
+    }
+
+    function switchDrawerSection(sec) {
+      const isHist = sec === "history";
+      document.getElementById("mainTabHistory").classList.toggle("active", isHist);
+      document.getElementById("mainTabSettings").classList.toggle("active", !isHist);
+      document.getElementById("sectionHistory").style.display = isHist ? "flex" : "none";
+      document.getElementById("sectionSettings").style.display = isHist ? "none" : "flex";
+    }
+
+    // --- Quản lý Lịch sử & Khôi phục video chạy dở ---
+    function loadHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        jobHistory = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        jobHistory = [];
+      }
+      renderHistoryDrawer();
+    }
+
+    function saveHistory() {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(jobHistory.slice(0, 40)));
+      } catch (e) {}
+      renderHistoryDrawer();
+    }
+
+    function upsertJob(jobData) {
+      const idx = jobHistory.findIndex(j => j.job_id === jobData.job_id);
+      if (idx >= 0) {
+        jobHistory[idx] = { ...jobHistory[idx], ...jobData };
+      } else {
+        jobHistory.unshift(jobData);
+      }
+      saveHistory();
+    }
+
+    function setHistoryFilter(filter) {
+      historyFilter = filter;
+      document.getElementById("tabAll").classList.toggle("active", filter === "all");
+      document.getElementById("tabRunning").classList.toggle("active", filter === "processing");
+      document.getElementById("tabDone").classList.toggle("active", filter === "completed");
+      renderHistoryDrawer();
+    }
+
+    function renderHistoryDrawer() {
+      const runningCount = jobHistory.filter(j => j.status === "processing" || j.status === "uploading").length;
+      const badge = document.getElementById("menuBadge");
+      badge.textContent = runningCount > 0 ? `${runningCount} chạy` : jobHistory.length;
+      badge.className = runningCount > 0 ? "menu-badge running" : "menu-badge";
+
+      const listEl = document.getElementById("historyList");
+      const filtered = jobHistory.filter(j => {
+        if (historyFilter === "processing") return j.status === "processing" || j.status === "uploading";
+        if (historyFilter === "completed") return j.status === "completed";
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div style="text-align:center; color:var(--muted); font-size:0.84rem; padding:28px 10px;">Chưa có video nào trong mục này.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(j => {
+        let stClass = "st-processing";
+        let stLabel = `Đang chạy ${j.progress || 0}%`;
+        if (j.status === "completed") {
+          stClass = "st-completed";
+          stLabel = "Hoàn thành";
+        } else if (j.status === "error") {
+          stClass = "st-error";
+          stLabel = "Lỗi";
+        }
+        const isFocused = j.job_id === focusedJobId ? "active-job" : "";
+        return `
+          <div class="hist-card ${isFocused}">
+            <div class="hist-top">
+              <div>
+                <div class="hist-name">${escapeHtml(j.file_name || "Video chưa đặt tên")}</div>
+                <div class="hist-meta">${j.created_at || ""} • ${(j.src_lang || "auto").toUpperCase()} → ${(j.tgt_lang || "vi").toUpperCase()}</div>
+              </div>
+              <span class="hist-status ${stClass}">${stLabel}</span>
+            </div>
+            ${(j.status === "processing" || j.status === "uploading") ? `
+              <div class="mini-bar">
+                <div class="mini-fill" style="width:${j.progress || 5}%;"></div>
+              </div>
+              <div class="hist-meta">${escapeHtml(j.message || "Đang xử lý ngầm trên Colab...")}</div>
+            ` : ""}
+            <div class="hist-actions">
+              ${j.status === "completed" ? `<button class="btn-primary" onclick="loadHistoryResult('${j.job_id}')">Mở xem & Lưu</button>` : ""}
+              ${(j.status === "processing" || j.status === "uploading") ? `<button class="btn-outline" onclick="focusRunningJob('${j.job_id}')">Xem vòng tiến độ</button>` : ""}
+              <button class="btn-danger" style="flex:0 0 auto;" onclick="removeHistoryItem('${j.job_id}')">Xóa</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+    }
+
+    function removeHistoryItem(jobId) {
+      jobHistory = jobHistory.filter(j => j.job_id !== jobId);
+      if (focusedJobId === jobId) {
+        focusedJobId = null;
+        document.getElementById("section4Card").style.display = "none";
+      }
+      saveHistory();
+      disableBackgroundKeepAliveIfIdle();
+    }
+
+    function clearCompletedHistory() {
+      jobHistory = jobHistory.filter(j => j.status === "processing" || j.status === "uploading");
+      saveHistory();
+    }
+
+    function focusRunningJob(jobId) {
+      const job = jobHistory.find(j => j.job_id === jobId);
+      if (!job) return;
+      focusedJobId = jobId;
+      showCircularProgress(job.progress || 15, job.file_name, job.message || "Đang xử lý...");
+      renderHistoryDrawer();
+      closeDrawer();
+      document.getElementById("section4Card").scrollIntoView({ behavior: "smooth" });
+    }
+
+    async function loadHistoryResult(jobId) {
+      const job = jobHistory.find(j => j.job_id === jobId);
+      if (!job) return;
+      closeDrawer();
+      const url = getBaseUrl() || job.api_url;
+      if (!url) {
+        openDrawer("settings");
+        return alert("Hãy nhập Token Google Colab trong Cài đặt để mở video!");
+      }
+      focusedJobId = jobId;
+      await finalizeResult(url, jobId, job.segments || [], job.file_name || "video_da_dich.mp4", false);
+    }
+
+    // --- Điều khiển Phần 4: Vòng tròn tiến độ & Khung hoàn thành ---
+    function showCircularProgress(pct, fileName, statusMsg) {
+      const sec4 = document.getElementById("section4Card");
+      sec4.style.display = "flex";
+      document.getElementById("sec4Badge").textContent = "Đang xử lý";
+      document.getElementById("sec4Badge").className = "badge";
+
+      document.getElementById("circularProgressBox").style.display = "flex";
+      document.getElementById("completedShowcase").style.display = "none";
+
+      const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+      const offset = RING_CIRCUMFERENCE - (clamped / 100) * RING_CIRCUMFERENCE;
+      document.getElementById("ringFg").style.strokeDashoffset = offset;
+      document.getElementById("ringPct").textContent = `${clamped}%`;
+      if (fileName) document.getElementById("ringFileName").textContent = fileName;
+      if (statusMsg) document.getElementById("ringStatusMsg").textContent = statusMsg;
+    }
+
+    // --- Vòng lặp chạy ngầm ---
+    function ensureBackgroundPoller() {
+      if (backgroundPoller) return;
+      backgroundPoller = setInterval(pollAllActiveJobs, 2500);
+    }
+
+    async function pollAllActiveJobs() {
+      const activeJobs = jobHistory.filter(j => j.status === "processing" || j.status === "uploading");
+      if (activeJobs.length === 0) {
+        disableBackgroundKeepAliveIfIdle();
+        return;
+      }
+
+      for (const job of activeJobs) {
+        const url = getBaseUrl() || job.api_url;
+        if (!url) continue;
+        try {
+          const res = await fetch(`${url}/api/status/${job.job_id}`);
+          if (!res.ok) continue;
+          const data = await res.json();
+
+          if (data.status === "processing") {
+            const scaledPct = Math.min(96, Math.max(15, Math.round((data.progress || 15) * 0.96)));
+            upsertJob({
+              job_id: job.job_id,
+              status: "processing",
+              progress: scaledPct,
+              message: data.message || "Đang xử lý...",
+              segments: data.segments || job.segments || []
+            });
+            if (focusedJobId === job.job_id) {
+              showCircularProgress(scaledPct, job.file_name, data.message || "Đang xử lý...");
+            }
+          } else if (data.status === "completed") {
+            upsertJob({
+              job_id: job.job_id,
+              status: "completed",
+              progress: 100,
+              message: "Hoàn tất!",
+              segments: data.segments || []
+            });
+            triggerCompletionNotification(job.file_name || "Video");
+            if (focusedJobId === job.job_id || activeJobs.length === 1) {
+              focusedJobId = job.job_id;
+              await finalizeResult(url, job.job_id, data.segments || [], job.file_name || "video_da_dich.mp4", true);
+            }
+            disableBackgroundKeepAliveIfIdle();
+          } else if (data.status === "error") {
+            upsertJob({
+              job_id: job.job_id,
+              status: "error",
+              message: data.message || "Lỗi xử lý"
+            });
+            if (focusedJobId === job.job_id) {
+              showCircularProgress(job.progress || 0, job.file_name, "Lỗi: " + data.message);
+            }
+            disableBackgroundKeepAliveIfIdle();
+          }
+        } catch (e) {}
+      }
+    }
+
+    async function syncJobsFromServer(showToast = false) {
+      const url = getBaseUrl();
+      if (!url) {
+        if (showToast) alert("Chưa có Token Colab trong Cài đặt.");
+        return;
+      }
+      try {
+        const res = await fetch(`${url}/api/jobs`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverJobs = data.jobs || [];
+        for (const sj of serverJobs) {
+          const existing = jobHistory.find(j => j.job_id === sj.job_id);
+          upsertJob({
+            job_id: sj.job_id,
+            file_name: (existing && existing.file_name) || sj.file_name || `Video_${sj.job_id}.mp4`,
+            src_lang: (existing && existing.src_lang) || sj.src_lang || "auto",
+            tgt_lang: (existing && existing.tgt_lang) || sj.tgt_lang || "vi",
+            status: sj.status,
+            progress: sj.status === "completed" ? 100 : Math.min(96, Math.max(15, Math.round((sj.progress || 15) * 0.96))),
+            message: sj.message || "",
+            created_at: (existing && existing.created_at) || sj.created_at || "Vừa xong",
+            api_url: url,
+            segments: sj.segments || (existing && existing.segments) || []
+          });
+        }
+        const running = jobHistory.find(j => j.status === "processing");
+        if (running && !focusedJobId) {
+          focusedJobId = running.job_id;
+          showCircularProgress(running.progress, running.file_name, running.message);
+        }
+        ensureBackgroundPoller();
+        if (showToast) alert(`Đã đồng bộ ${serverJobs.length} tác vụ từ Colab!`);
+      } catch (e) {
+        if (showToast) alert("Không thể đồng bộ từ Colab. Hãy kiểm tra lại Token.");
+      }
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        pollAllActiveJobs();
+      }
+    });
+
+    async function checkServer(isManual = false) {
+      const url = getBaseUrl();
+      const badge = document.getElementById("serverBadge");
+      if (!url) {
+        badge.textContent = "Chưa kết nối Colab";
+        badge.className = "badge";
+        if (isManual) alert("Bạn chưa dán Token / Link Google Colab.");
+        return;
+      }
+      badge.textContent = "Đang kết nối...";
+      badge.className = "badge";
+      try {
+        const res = await fetch(`${url}/health`);
+        const data = await res.json();
+        if (data.status === "ok") {
+          badge.textContent = `Online (${data.gpu || "GPU Ready"})`;
+          badge.className = "badge online";
+          await syncJobsFromServer(false);
+        } else {
+          throw new Error();
+        }
+      } catch (e) {
+        badge.textContent = "Mất kết nối Colab";
+        badge.className = "badge";
+        if (isManual) alert("Không kết nối được tới Colab. Hãy kiểm tra xem ô code Colab còn chạy không.");
+      }
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      document.getElementById("fileName").textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+      const video = document.getElementById("previewVideo");
+      video.src = URL.createObjectURL(file);
+      document.getElementById("videoStage").style.display = "block";
+      document.getElementById("drawHint").style.display = "block";
+      document.getElementById("btnToggleDraw").style.display = "inline-flex";
+      logoBoxes = [];
+      drawMode = false;
+      updateDrawButton();
+      video.onloadedmetadata = () => resizeCanvas();
+    }
+
+    const canvas = document.getElementById("overlayCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function toggleDrawMode() {
+      drawMode = !drawMode;
+      updateDrawButton();
+    }
+
+    function updateDrawButton() {
+      const btn = document.getElementById("btnToggleDraw");
+      if (drawMode) {
+        btn.textContent = "Khoanh logo: Đang bật";
+        btn.className = "btn-active";
+        canvas.style.pointerEvents = "auto";
+        canvas.style.touchAction = "none";
+      } else {
+        btn.textContent = "Khoanh logo: Tắt";
+        btn.className = "btn-outline";
+        canvas.style.pointerEvents = "none";
+        canvas.style.touchAction = "auto";
+      }
+    }
+
+    function resizeCanvas() {
+      const video = document.getElementById("previewVideo");
+      canvas.width = video.clientWidth;
+      canvas.height = video.clientHeight;
+      redrawBoxes();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    function getPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      return {
+        x: Math.max(0, Math.min(rect.width, clientX - rect.left)),
+        y: Math.max(0, Math.min(rect.height, clientY - rect.top))
+      };
+    }
+
+    function startDraw(evt) {
+      if (!selectedFile || !drawMode) return;
+      evt.preventDefault();
+      isDrawing = true;
+      const pos = getPos(evt);
+      startX = pos.x;
+      startY = pos.y;
+    }
+
+    function moveDraw(evt) {
+      if (!isDrawing || !drawMode) return;
+      evt.preventDefault();
+      const pos = getPos(evt);
+      redrawBoxes();
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.fillStyle = "rgba(239, 68, 68, 0.25)";
+      const w = pos.x - startX;
+      const h = pos.y - startY;
+      ctx.fillRect(startX, startY, w, h);
+      ctx.strokeRect(startX, startY, w, h);
+    }
+
+    function endDraw(evt) {
+      if (!isDrawing || !drawMode) return;
+      isDrawing = false;
+      const rect = canvas.getBoundingClientRect();
+      const endClientX = evt.changedTouches ? evt.changedTouches[0].clientX : evt.clientX;
+      const endClientY = evt.changedTouches ? evt.changedTouches[0].clientY : evt.clientY;
+      const endX = Math.max(0, Math.min(rect.width, endClientX - rect.left));
+      const endY = Math.max(0, Math.min(rect.height, endClientY - rect.top));
+
+      const x = Math.min(startX, endX) / canvas.width;
+      const y = Math.min(startY, endY) / canvas.height;
+      const w = Math.abs(endX - startX) / canvas.width;
+      const h = Math.abs(endY - startY) / canvas.height;
+
+      if (w * h > 0.55) {
+        alert("Vùng chọn quá lớn. Chỉ nên khoanh gọn vào góc có logo.");
+        redrawBoxes();
+        return;
+      }
+
+      if (w > 0.02 && h > 0.02) {
+        logoBoxes.push({ x, y, w, h });
+        document.getElementById("btnClearBoxes").style.display = "inline-flex";
+      }
+      redrawBoxes();
+    }
+
+    function redrawBoxes() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.fillStyle = "rgba(239, 68, 68, 0.25)";
+      logoBoxes.forEach((b, idx) => {
+        const px = b.x * canvas.width;
+        const py = b.y * canvas.height;
+        const pw = b.w * canvas.width;
+        const ph = b.h * canvas.height;
+        ctx.fillRect(px, py, pw, ph);
+        ctx.strokeRect(px, py, pw, ph);
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(`Logo #${idx + 1}`, px + 4, py + 14);
+        ctx.fillStyle = "rgba(239, 68, 68, 0.25)";
+      });
+    }
+
+    function clearBoxes() {
+      logoBoxes = [];
+      document.getElementById("btnClearBoxes").style.display = "none";
+      redrawBoxes();
+    }
+
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", moveDraw);
+    window.addEventListener("mouseup", endDraw);
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", moveDraw, { passive: false });
+    canvas.addEventListener("touchend", endDraw);
+
+    function formatNow() {
+      const d = new Date();
+      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+
+    function startProcessing() {
+      const url = getBaseUrl();
+      if (!url) {
+        openDrawer("settings");
+        return alert("Bạn chưa nhập Token Google Colab! Hãy đăng nhập và dán Token trong Cài đặt.");
+      }
+      if (!selectedFile) return alert("Bạn chưa chọn video!");
+
+      requestNotifyPermission();
+      enableBackgroundKeepAlive();
+
+      const clientJobId = Math.random().toString(36).substring(2, 10);
+      const srcLang = document.getElementById("srcLang").value;
+      const tgtLang = document.getElementById("tgtLang").value;
+      const origFileName = selectedFile.name;
+
+      focusedJobId = clientJobId;
+      upsertJob({
+        job_id: clientJobId,
+        file_name: origFileName,
+        src_lang: srcLang,
+        tgt_lang: tgtLang,
+        status: "uploading",
+        progress: 2,
+        message: "Đang tải video lên máy chủ...",
+        created_at: formatNow(),
+        api_url: url,
+        segments: []
+      });
+
+      showCircularProgress(2, origFileName, "Đang tải video lên máy chủ...");
+      document.getElementById("section4Card").scrollIntoView({ behavior: "smooth" });
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("client_job_id", clientJobId);
+      formData.append("orig_filename", origFileName);
+      formData.append("src_lang", srcLang);
+      formData.append("tgt_lang", tgtLang);
+      formData.append("dubbing", document.getElementById("optDubbing").checked);
+      formData.append("erase_text", document.getElementById("optEraseText").checked);
+      formData.append("burn_sub", document.getElementById("optBurnSub").checked);
+      formData.append("logo_boxes", JSON.stringify(logoBoxes));
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${url}/api/process`, true);
+      xhr.timeout = 300000;
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const uploadPct = Math.round((e.loaded / e.total) * 100);
+          const barPct = Math.max(3, Math.min(15, Math.round(uploadPct * 0.15)));
+          const msg = uploadPct < 100 ? `Đang tải video lên (${uploadPct}%)...` : "Đã tải xong, Colab đang xử lý ngầm...";
+          upsertJob({ job_id: clientJobId, status: uploadPct < 100 ? "uploading" : "processing", progress: barPct, message: msg });
+          if (focusedJobId === clientJobId) {
+            showCircularProgress(barPct, origFileName, msg);
+          }
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            const serverJobId = data.job_id || clientJobId;
+            upsertJob({
+              job_id: serverJobId,
+              status: "processing",
+              progress: 15,
+              message: "Đang xử lý ngầm trên Colab..."
+            });
+            ensureBackgroundPoller();
+          } catch (err) {
+            upsertJob({ job_id: clientJobId, status: "error", message: err.message });
+          }
+        } else {
+          upsertJob({ job_id: clientJobId, status: "error", message: `Server báo lỗi mã ${xhr.status}` });
+          if (focusedJobId === clientJobId) alert(`Server Colab không phản hồi (Mã ${xhr.status}).`);
+        }
+      };
+
+      xhr.onerror = () => {
+        upsertJob({ job_id: clientJobId, status: "processing", message: "Đang kiểm tra lại kết nối ngầm..." });
+        ensureBackgroundPoller();
+      };
+
+      xhr.ontimeout = () => {
+        upsertJob({ job_id: clientJobId, status: "error", message: "Hết thời gian chờ tải lên" });
+      };
+
+      xhr.send(formData);
+    }
+
+    async function finalizeResult(url, jobId, segments, origName = "video_da_dich.mp4", shouldScroll = true) {
+      showCircularProgress(98, origName, "Đang tải video thành phẩm vào bộ nhớ...");
+
+      const videoApiUrl = `${url}/api/download/${jobId}/video`;
+      const srtApiUrl = `${url}/api/download/${jobId}/srt`;
+
+      let finalVideoSrc = videoApiUrl;
+      let finalSrtSrc = srtApiUrl;
+      cachedVideoBlob = null;
+      cachedFileName = origName.replace(/\.[^/.]+$/, "") + "_da_dich.mp4";
+
+      const saveBtn = document.getElementById("saveLibraryBtn");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "⏳ Đang nạp file lưu...";
+
+      try {
+        const [vRes, sRes] = await Promise.all([
+          fetch(videoApiUrl, { cache: "no-store" }),
+          fetch(srtApiUrl, { cache: "no-store" })
+        ]);
+        if (vRes.ok) {
+          const buf = await vRes.arrayBuffer();
+          if (buf.byteLength > 1000) {
+            cachedVideoBlob = new Blob([buf], { type: "video/mp4" });
+            finalVideoSrc = URL.createObjectURL(cachedVideoBlob);
+          }
+        }
+        if (sRes.ok) {
+          const srtBlob = await sRes.blob();
+          finalSrtSrc = URL.createObjectURL(srtBlob);
+        }
+      } catch (e) {}
+
+      saveBtn.disabled = false;
+      saveBtn.textContent = "📲 Lưu vào Thư viện";
+
+      // Chuyển từ vòng tròn tiến độ sang khung hoàn thành riêng biệt
+      const sec4 = document.getElementById("section4Card");
+      sec4.style.display = "flex";
+      document.getElementById("sec4Badge").textContent = "Đã xong 100%";
+      document.getElementById("sec4Badge").className = "badge online";
+
+      document.getElementById("circularProgressBox").style.display = "none";
+      const showcase = document.getElementById("completedShowcase");
+      showcase.style.display = "flex";
+      document.getElementById("resultTitle").textContent = origName;
+
+      const resultVideo = document.getElementById("resultVideo");
+      resultVideo.src = finalVideoSrc;
+      resultVideo.load();
+
+      const dlVid = document.getElementById("downloadVideoBtn");
+      dlVid.href = finalVideoSrc;
+      dlVid.download = cachedFileName;
+
+      document.getElementById("downloadSrtBtn").href = finalSrtSrc;
+
+      const tBox = document.getElementById("transcriptBox");
+      tBox.innerHTML = segments.map(s => `
+        <div class="seg-item">
+          <div class="seg-time">[${s.start.toFixed(1)}s - ${s.end.toFixed(1)}s] • <span style="color:#10b981;">${s.role || "Nhân vật"} (Giọng gốc)</span></div>
+          <div><strong>Gốc:</strong> ${s.orig}</div>
+          <div style="color:#38bdf8;"><strong>Dịch:</strong> ${s.trans}</div>
+        </div>
+      `).join("");
+
+      if (shouldScroll) {
+        showcase.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+
+    async function saveToLibrary() {
+      // Mở thẳng bảng chia sẻ gốc của iPhone cho file MP4 để hiện nút "Lưu video" vào Ảnh
+      if (!cachedVideoBlob) {
+        alert("Video chưa nạp xong vào bộ nhớ máy. Hãy đợi 2 giây hoặc bấm 'Tải Video (.MP4)'.");
+        return;
+      }
+
+      const file = new File([cachedVideoBlob], cachedFileName, {
+        type: "video/mp4",
+        lastModified: Date.now()
+      });
+
+      if (navigator.share) {
+        try {
+          // Chỉ truyền files (không kèm url/text) để iOS Safari nhận diện đúng file video và hiện "Lưu video"
+          await navigator.share({ files: [file] });
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+        }
+      }
+
+      document.getElementById("downloadVideoBtn").click();
+    }
+
+    // Khởi tạo khi mở trang
+    window.addEventListener("DOMContentLoaded", () => {
+      updateAuthUI();
+      const savedToken = localStorage.getItem(TOKEN_KEY);
+      if (savedToken) {
+        document.getElementById("apiUrl").value = savedToken;
+      }
+      loadHistory();
+
+      const running = jobHistory.find(j => j.status === "processing" || j.status === "uploading");
+      if (running) {
+        focusedJobId = running.job_id;
+        showCircularProgress(running.progress || 15, running.file_name, "Đang khôi phục tiến trình ngầm...");
+        ensureBackgroundPoller();
+      }
+      if (getBaseUrl()) {
+        checkServer(false);
+      }
+    });
+  </script>
+</body>
+</html>
